@@ -22,18 +22,18 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		comparator Compare
+		csv Csv
 	}
 
 	// ModuleInstance represents an instance of the JS module.
 	ModuleInstance struct {
 		// vu provides methods for accessing internal k6 objects for a VU
 		vu modules.VU
-		// comparator is the exported type
-		comparator *Compare
+		// csv is the exported type
+		csv *Csv
 	}
 	// Compare is the type for our custom API.
-	Compare struct {
+	Csv struct {
 		vu       modules.VU // provides methods for accessing internal k6 objects
 		mu       sync.Mutex
 		FilePath string
@@ -50,14 +50,14 @@ var (
 
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
-	return &RootModule{comparator: Compare{}}
+	return &RootModule{csv: Csv{}}
 }
 
 // NewModuleInstance implements the modules.Module interface returning a new instance for each VU.
 func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	return &ModuleInstance{
-		vu:         vu,
-		comparator: &rm.comparator,
+		vu:  vu,
+		csv: &rm.csv,
 	}
 }
 
@@ -69,12 +69,12 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 }
 
 // Close closes the file
-func (c *Compare) Close() {
+func (c *Csv) Close() {
 	c.File.Close()
 }
 
 // GetLine reads line and checks for EOF, then split by sep and return array with values
-func (c *Compare) GetLine(sep string) []string {
+func (c *Csv) GetLine(sep string) []string {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.Scanner.Scan() {
@@ -113,25 +113,25 @@ func (c *Compare) GetLine(sep string) []string {
 // GetCsv reads the csv file and returns a csv instance.
 func (mi *ModuleInstance) GetCsv(call goja.ConstructorCall) *goja.Object {
 	rt := mi.vu.Runtime()
-	mi.comparator.FilePath = call.Argument(0).String()
+	mi.csv.FilePath = call.Argument(0).String()
 
-	fileStats, err := os.Stat(mi.comparator.FilePath)
+	fileStats, err := os.Stat(mi.csv.FilePath)
 	if err != nil {
 		common.Throw(rt, errors.New("Cant open the file"))
 		panic(err)
 	}
 	if fileStats.Size() == 0 {
-		common.Throw(rt, errors.New(fmt.Sprintf("File %s is empty", mi.comparator.FilePath)))
+		common.Throw(rt, errors.New(fmt.Sprintf("File %s is empty", mi.csv.FilePath)))
 		panic(err)
 	}
 
-	file, err := os.Open(mi.comparator.FilePath)
+	file, err := os.Open(mi.csv.FilePath)
 	if err != nil {
 		common.Throw(rt, errors.New("Cant open the file"))
 		panic(err)
 	}
-	mi.comparator.File = file
+	mi.csv.File = file
 	scanner := bufio.NewScanner(file)
-	mi.comparator.Scanner = scanner
-	return rt.ToValue(mi.comparator).ToObject(rt)
+	mi.csv.Scanner = scanner
+	return rt.ToValue(mi.csv).ToObject(rt)
 }
